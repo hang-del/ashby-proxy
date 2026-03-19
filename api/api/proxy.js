@@ -15,7 +15,19 @@ module.exports = function handler(req, res) {
     return;
   }
 
-  const { endpoint, body, ashbyKey } = req.body;
+  let body = req.body;
+  
+  if (typeof body === 'string') {
+    try { body = JSON.parse(body); } catch(e) {}
+  }
+  
+  if (!body) {
+    res.status(400).json({ error: 'Empty request body' });
+    return;
+  }
+
+  const { endpoint, ashbyKey } = body;
+  const requestBody = body.body;
 
   if (!endpoint || !ashbyKey) {
     res.status(400).json({ error: 'Missing endpoint or ashbyKey' });
@@ -23,7 +35,7 @@ module.exports = function handler(req, res) {
   }
 
   const encoded = Buffer.from(ashbyKey + ':').toString('base64');
-  const postData = JSON.stringify(body || {});
+  const postData = JSON.stringify(requestBody || {});
 
   const options = {
     hostname: 'api.ashbyhq.com',
