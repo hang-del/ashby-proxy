@@ -10,16 +10,15 @@ module.exports = function handler(req, res) {
     return;
   }
 
-  let body = req.body;
-  if (typeof body === 'string') {
-    try { body = JSON.parse(body); } catch(e) {}
+  const { endpoint, body, ashbyKey } = req.body || {};
+
+  if (!endpoint || !ashbyKey) {
+    res.status(200).json({ success: false, results: [], errors: ['Missing endpoint or ashbyKey'] });
+    return;
   }
 
-  const { endpoint, ashbyKey } = body;
-  const requestBody = body.body;
-
   const encoded = Buffer.from(ashbyKey + ':').toString('base64');
-  const postData = JSON.stringify(requestBody || {});
+  const postData = JSON.stringify(body || {});
 
   const options = {
     hostname: 'api.ashbyhq.com',
@@ -40,13 +39,13 @@ module.exports = function handler(req, res) {
         const parsed = JSON.parse(data);
         res.status(200).json(parsed);
       } catch(e) {
-        res.status(200).json({ raw: data });
+        res.status(200).json({ success: false, results: [], raw: data.substring(0, 200) });
       }
     });
   });
 
   ashbyReq.on('error', function(err) {
-    res.status(500).json({ error: err.message });
+    res.status(200).json({ success: false, results: [], error: err.message });
   });
 
   ashbyReq.write(postData);
