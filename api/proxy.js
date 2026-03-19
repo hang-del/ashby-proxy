@@ -1,3 +1,9 @@
+export const config = {
+  api: {
+    bodyParser: true,
+  },
+};
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -17,7 +23,10 @@ export default async function handler(req, res) {
     const { endpoint, body, ashbyKey } = req.body;
 
     if (!endpoint || !ashbyKey) {
-      res.status(400).json({ error: 'Missing endpoint or ashbyKey' });
+      res.status(400).json({ 
+        error: 'Missing endpoint or ashbyKey',
+        received: Object.keys(req.body || {})
+      });
       return;
     }
 
@@ -32,10 +41,19 @@ export default async function handler(req, res) {
       body: JSON.stringify(body || {}),
     });
 
-    const data = await ashbyRes.json();
-    res.status(200).json(data);
+    const text = await ashbyRes.text();
+    
+    try {
+      const data = JSON.parse(text);
+      res.status(200).json(data);
+    } catch(e) {
+      res.status(200).send(text);
+    }
 
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ 
+      error: err.message,
+      stack: err.stack
+    });
   }
 }
