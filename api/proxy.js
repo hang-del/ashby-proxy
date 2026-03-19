@@ -8,24 +8,31 @@ export default async function handler(req, res) {
     return;
   }
 
-  const { endpoint, body, ashbyKey } = req.body;
-
-  if (!endpoint || !ashbyKey) {
-    res.status(400).json({ error: 'Missing endpoint or ashbyKey' });
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed' });
     return;
   }
 
   try {
-    const response = await fetch(`https://api.ashbyhq.com${endpoint}`, {
+    const { endpoint, body, ashbyKey } = req.body;
+
+    if (!endpoint || !ashbyKey) {
+      res.status(400).json({ error: 'Missing endpoint or ashbyKey' });
+      return;
+    }
+
+    const encoded = Buffer.from(ashbyKey + ':').toString('base64');
+
+    const ashbyRes = await fetch('https://api.ashbyhq.com' + endpoint, {
       method: 'POST',
       headers: {
-        'Authorization': 'Basic ' + btoa(ashbyKey + ':'),
+        'Authorization': 'Basic ' + encoded,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(body || {}),
     });
 
-    const data = await response.json();
+    const data = await ashbyRes.json();
     res.status(200).json(data);
 
   } catch (err) {
