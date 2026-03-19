@@ -1,10 +1,6 @@
-export const config = {
-  api: {
-    bodyParser: true,
-  },
-};
+const https = require('https');
 
-export default async function handler(req, res) {
+module.exports = function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -14,46 +10,45 @@ export default async function handler(req, res) {
     return;
   }
 
-  if (req.method !== 'POST') {
-    res.status(405).json({ error: 'Method not allowed' });
-    return;
+  let body = req.body;
+  if (typeof body === 'string') {
+    try { body = JSON.parse(body); } catch(e) {}
   }
 
-  try {
-    const { endpoint, body, ashbyKey } = req.body;
+  const { endpoint, ashbyKey } = body;
+  const requestBody = body.body;
 
-    if (!endpoint || !ashbyKey) {
-      res.status(400).json({ 
-        error: 'Missing endpoint or ashbyKey',
-        received: Object.keys(req.body || {})
-      });
-      return;
-    }
+  const encoded = Buffer.from(ashbyKey + ':').toString('base64');
+  const postData = JSON.stringify(requestBody || {});
 
-    const encoded = Buffer.from(ashbyKey + ':').toString('base64');
+  const options = {
+    hostname: 'api.ashbyhq.com',
+    path: endpoint,
+    method: 'POST',
+    headers: {
+      'Authorization': 'Basic ' + encoded,
+      'Content-Type': 'application/json',
+      'Content-Length': Buffer.byteLength(postData),
+    },
+  };
 
-    const ashbyRes = await fetch('https://api.ashbyhq.com' + endpoint, {
-      method: 'POST',
-      headers: {
-        'Authorization': 'Basic ' + encoded,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body || {}),
+  const ashbyReq = https.request(options, function(ashbyRes) {
+    let data = '';
+    ashbyRes.on('data', function(chunk) { data += chunk; });
+    ashbyRes.on('end', function() {
+      try {
+        const parsed = JSON.parse(data);
+        res.status(200).json(parsed);
+      } catch(e) {
+        res.status(200).json({ raw: data });
+      }
     });
+  });
 
-    const text = await ashbyRes.text();
-    
-    try {
-      const data = JSON.parse(text);
-      res.status(200).json(data);
-    } catch(e) {
-      res.status(200).send(text);
-    }
+  ashbyReq.on('error', function(err) {
+    res.status(500).json({ error: err.message });
+  });
 
-  } catch (err) {
-    res.status(500).json({ 
-      error: err.message,
-      stack: err.stack
-    });
-  }
-}
+  ashbyReq.write(postData);
+  ashbyReq.end();
+};
